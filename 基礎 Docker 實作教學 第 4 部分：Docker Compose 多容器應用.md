@@ -3,7 +3,7 @@
 如果導入 Kubernetes，這章節可以省略。因為 Docker Compose 的功能在 Kubernetes 中已經被更強大的功能所取代。並且，Kubernetes 提供了更高層次的抽象和管理功能，適合大規模的容器化應用部署。
 但 Docker Compose 在本地開發和小型專案中仍然非常有用，因為它簡化了多容器應用的管理和配置。
 
-課程時間：30 分鐘
+課程時間：40 分鐘
 
 - Docker Compose 基本概念與語法
 - 實作練習：建立 Web + 資料庫應用
