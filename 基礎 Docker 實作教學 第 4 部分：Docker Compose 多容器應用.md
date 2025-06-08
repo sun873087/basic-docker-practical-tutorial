@@ -1,5 +1,8 @@
 # 基礎 Docker 實作教學(第四部分：Docker Compose 多容器應用)
 
+如果導入 Kubernetes，這章節可以省略。因為 Docker Compose 的功能在 Kubernetes 中已經被更強大的功能所取代。並且，Kubernetes 提供了更高層次的抽象和管理功能，適合大規模的容器化應用部署。
+但 Docker Compose 在本地開發和小型專案中仍然非常有用，因為它簡化了多容器應用的管理和配置。
+
 課程時間：30 分鐘
 
 - Docker Compose 基本概念與語法
@@ -34,7 +37,7 @@ docker run -d --name database --network myapp-network -e MYSQL_ROOT_PASSWORD=sec
 docker run -d --name webapp --network myapp-network -p 8080:5000 my-flask-app
 
 # Docker Compose 方式：一個指令搞定
-docker-compose up -d
+docker compose up -d
 ```
 
 #### 2. 環境一致性
@@ -173,55 +176,55 @@ networks:
 
 ```bash
 # 啟動所有服務（前台運行）
-docker-compose up
+docker compose up
 
 # 啟動所有服務（背景運行）
-docker-compose up -d
+docker compose up -d
 
 # 停止所有服務
-docker-compose down
+docker compose down
 
 # 停止並刪除所有資源（包括卷）
-docker-compose down -v
+docker compose down -v
 ```
 
 #### 2. 建立和管理
 
 ```bash
 # 建立或重建服務
-docker-compose build
+docker compose build
 
 # 建立並啟動
-docker-compose up --build
+docker compose up --build
 
 # 只啟動特定服務
-docker-compose up web database
+docker compose up web database
 ```
 
 #### 3. 監控和除錯
 
 ```bash
 # 查看服務狀態
-docker-compose ps
+docker compose ps
 
 # 查看服務日誌
-docker-compose logs
-docker-compose logs web        # 特定服務的日誌
-docker-compose logs -f web     # 即時跟蹤日誌
+docker compose logs
+docker compose logs web        # 特定服務的日誌
+docker compose logs -f web     # 即時跟蹤日誌
 
 # 進入服務容器
-docker-compose exec web bash
+docker compose exec web bash
 ```
 
 #### 4. 擴展和重啟
 
 ```bash
 # 擴展服務實例
-docker-compose up --scale web=3
+docker compose up --scale web=3
 
 # 重啟服務
-docker-compose restart
-docker-compose restart web    # 重啟特定服務
+docker compose restart
+docker compose restart web    # 重啟特定服務
 ```
 
 ### 🎯 Docker Compose 最佳實踐
@@ -250,18 +253,12 @@ docker-compose restart web    # 重啟特定服務
 - 掌握 Docker Compose 的實際應用
 - 學習多容器應用的管理和監控
 
-### 📁 步驟 1：建立專案結構
+### 📁 步驟 1：建立專案結構 & 建立 Flask 應用 & 建立資料庫初始化檔案
 
-首先建立專案目錄結構：
+首先，讓我們建立專案的基本結構，並撰寫 Flask 應用和 MySQL 資料庫初始化腳本。因教學時間關係，我們將使用 GitHub 上的範例專案。請參考[基礎 Docker 實作教學 第 1 部分：快速入門](基礎%20Docker%20實作教學%20第%201%20部分：快速入門.md)中的範例。
 
 ```bash
-mkdir flask-mysql-app
-cd flask-mysql-app
-
-# 建立目錄結構
-mkdir app
-mkdir database
-mkdir database/init
+cd dockercompose/flask-mysql-app
 ```
 
 最終的專案結構：
@@ -280,429 +277,7 @@ flask-mysql-app/
         └── init.sql
 ```
 
-### 🐍 步驟 2：建立 Flask 應用
-
-**建立 `app/requirements.txt`：**
-```txt
-Flask==2.3.3
-mysql-connector-python==8.1.0
-Werkzeug==2.3.7
-```
-
-**建立 `app/app.py`：**
-```python
-from flask import Flask, render_template, request, jsonify
-import mysql.connector
-import os
-import time
-
-app = Flask(__name__)
-
-# 資料庫連接配置
-DB_CONFIG = {
-    'host': os.environ.get('DB_HOST', 'database'),
-    'user': os.environ.get('DB_USER', 'appuser'),
-    'password': os.environ.get('DB_PASSWORD', 'apppass'),
-    'database': os.environ.get('DB_NAME', 'flask_app'),
-    'port': int(os.environ.get('DB_PORT', 3306))
-}
-
-def get_db_connection():
-    """建立資料庫連接，包含重試機制"""
-    max_retries = 5
-    for attempt in range(max_retries):
-        try:
-            connection = mysql.connector.connect(**DB_CONFIG)
-            return connection
-        except mysql.connector.Error as e:
-            print(f"資料庫連接失敗 (嘗試 {attempt + 1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                time.sleep(5)  # 等待 5 秒後重試
-            else:
-                raise
-
-@app.route('/')
-def home():
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        
-        # 查詢使用者資料
-        cursor.execute("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC")
-        users = cursor.fetchall()
-        
-        cursor.close()
-        connection.close()
-        
-        return render_template('index.html', users=users)
-    except Exception as e:
-        return render_template('index.html', users=[], error=str(e))
-
-@app.route('/api/users', methods=['GET'])
-def get_users():
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        
-        cursor.execute("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC")
-        users = cursor.fetchall()
-        
-        cursor.close()
-        connection.close()
-        
-        return jsonify({'success': True, 'users': users})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/users', methods=['POST'])
-def add_user():
-    try:
-        data = request.get_json()
-        name = data.get('name')
-        email = data.get('email')
-        
-        if not name or not email:
-            return jsonify({'success': False, 'error': '姓名和電子郵件為必填欄位'})
-        
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        
-        cursor.execute(
-            "INSERT INTO users (name, email) VALUES (%s, %s)",
-            (name, email)
-        )
-        connection.commit()
-        
-        user_id = cursor.lastrowid
-        cursor.close()
-        connection.close()
-        
-        return jsonify({'success': True, 'user_id': user_id, 'message': '使用者新增成功'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/health')
-def health():
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        cursor.execute("SELECT 1")
-        cursor.fetchone()
-        cursor.close()
-        connection.close()
-        
-        return jsonify({
-            'status': 'healthy',
-            'database': 'connected',
-            'timestamp': time.time()
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'database': 'disconnected',
-            'error': str(e),
-            'timestamp': time.time()
-        }), 500
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
-```
-
-**建立 `app/templates/index.html`：**
-```html
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flask + MySQL Docker Compose Demo</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f8f9fa;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-            text-align: center;
-            color: #2c3e50;
-            margin-bottom: 30px;
-        }
-        .form-section {
-            background: #ecf0f1;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #34495e;
-        }
-        input[type="text"], input[type="email"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #bdc3c7;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-        button {
-            background: #3498db;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background: #2980b9;
-        }
-        .users-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        .users-table th, .users-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        .users-table th {
-            background-color: #34495e;
-            color: white;
-        }
-        .users-table tr:hover {
-            background-color: #f5f5f5;
-        }
-        .error {
-            color: #e74c3c;
-            background: #fadbd8;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-        }
-        .success {
-            color: #27ae60;
-            background: #d5f4e6;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-        }
-        .api-links {
-            margin-top: 30px;
-            text-align: center;
-        }
-        .api-links a {
-            display: inline-block;
-            margin: 10px;
-            padding: 10px 20px;
-            background: #9b59b6;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-        }
-        .api-links a:hover {
-            background: #8e44ad;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🐳 Flask + MySQL + Docker Compose</h1>
-            <p>多容器應用實作示範</p>
-        </div>
-        
-        {% if error %}
-        <div class="error">
-            <strong>錯誤：</strong> {{ error }}
-        </div>
-        {% endif %}
-        
-        <div class="form-section">
-            <h3>新增使用者</h3>
-            <form id="userForm">
-                <div class="form-group">
-                    <label for="name">姓名：</label>
-                    <input type="text" id="name" name="name" required>
-                </div>
-                <div class="form-group">
-                    <label for="email">電子郵件：</label>
-                    <input type="email" id="email" name="email" required>
-                </div>
-                <button type="submit">新增使用者</button>
-            </form>
-            <div id="message"></div>
-        </div>
-        
-        <div>
-            <h3>使用者列表</h3>
-            {% if users %}
-            <table class="users-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>姓名</th>
-                        <th>電子郵件</th>
-                        <th>建立時間</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for user in users %}
-                    <tr>
-                        <td>{{ user[0] }}</td>
-                        <td>{{ user[1] }}</td>
-                        <td>{{ user[2] }}</td>
-                        <td>{{ user[3] }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p>目前沒有使用者資料。</p>
-            {% endif %}
-        </div>
-        
-        <div class="api-links">
-            <h3>API 端點測試：</h3>
-            <a href="/api/users" target="_blank">查看使用者 API</a>
-            <a href="/health" target="_blank">健康檢查</a>
-            <a href="http://localhost:8081" target="_blank">phpMyAdmin</a>
-        </div>
-    </div>
-
-    <script>
-        document.getElementById('userForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
-            const messageDiv = document.getElementById('message');
-            
-            try {
-                const response = await fetch('/api/users', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ name, email })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    messageDiv.innerHTML = '<div class="success">' + result.message + '</div>';
-                    document.getElementById('userForm').reset();
-                    // 重新載入頁面以顯示新資料
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    messageDiv.innerHTML = '<div class="error">錯誤：' + result.error + '</div>';
-                }
-            } catch (error) {
-                messageDiv.innerHTML = '<div class="error">請求失敗：' + error.message + '</div>';
-            }
-        });
-    </script>
-</body>
-</html>
-```
-
-**建立 `app/Dockerfile`：**
-```dockerfile
-FROM python:3.9-slim
-
-WORKDIR /app
-
-# 安裝系統依賴
-RUN apt-get update && apt-get install -y \
-    default-libmysqlclient-dev \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# 複製並安裝 Python 依賴
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 複製應用程式代碼
-COPY . .
-
-# 建立非 root 使用者
-RUN useradd --create-home --shell /bin/bash app \
-    && chown -R app:app /app
-USER app
-
-EXPOSE 5000
-
-# 健康檢查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
-
-CMD ["python", "app.py"]
-```
-
-### 🗄️ 步驟 3：建立資料庫初始化檔案
-
-**建立 `database/init/init.sql`：**
-```sql
--- 建立資料庫（如果不存在）
-CREATE DATABASE IF NOT EXISTS flask_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- 使用資料庫
-USE flask_app;
-
--- 建立使用者表
-CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) NOT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
--- 插入範例資料
-INSERT INTO users (name, email) VALUES 
-('張小明', 'ming@example.com'),
-('李小華', 'hua@example.com'),
-('王大同', 'wang@example.com')
-ON DUPLICATE KEY UPDATE name=VALUES(name);
-
--- 建立索引
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_created_at ON users(created_at);
-```
-
 ### 🐳 步驟 4：撰寫 docker-compose.yml
-
-**建立 `.env` 檔案：**
-```env
-# 資料庫配置
-MYSQL_ROOT_PASSWORD=rootpassword123
-MYSQL_DATABASE=flask_app
-MYSQL_USER=appuser
-MYSQL_PASSWORD=apppass
-
-# 應用程式配置
-FLASK_ENV=development
-PORT=5000
-
-# phpMyAdmin 配置
-PMA_HOST=database
-PMA_PORT=3306
-```
 
 **建立 `docker-compose.yml`：**
 ```yaml
@@ -805,24 +380,24 @@ volumes:
 ls -la
 
 # 啟動所有服務（第一次會建立映像）
-docker-compose up --build
+docker compose up --build
 
 # 或者在背景運行
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 **查看服務狀態：**
 ```bash
 # 查看所有服務狀態
-docker-compose ps
+docker compose ps
 
 # 查看服務日誌
-docker-compose logs
-docker-compose logs web        # 只看 web 服務日誌
-docker-compose logs database   # 只看資料庫日誌
+docker compose logs
+docker compose logs web        # 只看 web 服務日誌
+docker compose logs database   # 只看資料庫日誌
 
 # 即時跟蹤日誌
-docker-compose logs -f web
+docker compose logs -f web
 ```
 
 ### 🧪 步驟 6：測試應用功能
@@ -858,7 +433,7 @@ curl -X POST http://localhost:8080/api/users \
 #### 4. 測試容器間通訊
 ```bash
 # 進入 web 容器
-docker-compose exec web bash
+docker compose exec web bash
 
 # 在容器內測試資料庫連接
 ping database
@@ -873,16 +448,16 @@ exit
 #### 1. 服務管理
 ```bash
 # 重啟特定服務
-docker-compose restart web
+docker compose restart web
 
 # 停止特定服務
-docker-compose stop database
+docker compose stop database
 
 # 重新建立並啟動服務
-docker-compose up --build web
+docker compose up --build web
 
 # 擴展服務實例
-docker-compose up --scale web=2
+docker compose up --scale web=2
 ```
 
 #### 2. 資源監控
@@ -902,7 +477,7 @@ docker volume inspect flask-mysql-data
 #### 3. 資料備份
 ```bash
 # 備份資料庫
-docker-compose exec database mysqldump -u root -p${MYSQL_ROOT_PASSWORD} flask_app > backup.sql
+docker compose exec database mysqldump -u root -p${MYSQL_ROOT_PASSWORD} flask_app > backup.sql
 
 # 或者備份整個資料卷
 docker run --rm -v flask-mysql-data:/data -v $(pwd):/backup alpine tar czf /backup/mysql-backup.tar.gz -C /data .
@@ -913,25 +488,25 @@ docker run --rm -v flask-mysql-data:/data -v $(pwd):/backup alpine tar czf /back
 #### 1. 服務啟動失敗
 ```bash
 # 查看詳細日誌
-docker-compose logs --details
+docker compose logs --details
 
 # 檢查服務狀態
-docker-compose ps
+docker compose ps
 
 # 重新建立有問題的服務
-docker-compose up --build --force-recreate web
+docker compose up --build --force-recreate web
 ```
 
 #### 2. 資料庫連接問題
 ```bash
 # 檢查資料庫是否準備就緒
-docker-compose exec database mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SHOW DATABASES;"
+docker compose exec database mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SHOW DATABASES;"
 
 # 測試網路連接
-docker-compose exec web ping database
+docker compose exec web ping database
 
 # 查看環境變數
-docker-compose exec web env | grep DB_
+docker compose exec web env | grep DB_
 ```
 
 #### 3. 端口衝突
@@ -946,10 +521,10 @@ netstat -tulpn | grep :8080
 #### 4. 卷掛載問題
 ```bash
 # 檢查卷是否正確掛載
-docker-compose exec database ls -la /var/lib/mysql
+docker compose exec database ls -la /var/lib/mysql
 
 # 檢查初始化腳本是否執行
-docker-compose exec database ls -la /docker-entrypoint-initdb.d/
+docker compose exec database ls -la /docker-entrypoint-initdb.d/
 ```
 
 #### 5. 權限問題
@@ -1003,7 +578,7 @@ nginx:
 # docker-compose.prod.yml - 生產環境
 
 # 使用特定環境啟動
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
 #### 4. 監控和日誌管理
@@ -1018,16 +593,7 @@ logging:
 
 ### 🔒 安全最佳實踐
 
-#### 1. 環境變數管理
-```bash
-# 使用 Docker Secrets（Docker Swarm）
-echo "mysecretpassword" | docker secret create db_password -
-
-# 或使用外部密鑰管理工具
-# 如 HashiCorp Vault、AWS Secrets Manager
-```
-
-#### 2. 網路安全
+#### 1. 網路安全
 ```yaml
 # 建立隔離的網路
 networks:
@@ -1038,7 +604,7 @@ networks:
     internal: true  # 內部網路，無法訪問外部
 ```
 
-#### 3. 容器安全
+#### 2. 容器安全
 ```dockerfile
 # 在 Dockerfile 中使用非 root 使用者
 RUN useradd --create-home --shell /bin/bash app
@@ -1050,16 +616,7 @@ EXPOSE 5000
 
 ### 🚀 部署到生產環境
 
-#### 1. Docker Swarm 部署
-```bash
-# 初始化 Swarm
-docker swarm init
-
-# 部署 stack
-docker stack deploy -c docker-compose.yml flask-app
-```
-
-#### 2. Kubernetes 部署
+#### 1. Kubernetes 部署
 ```bash
 # 使用 Kompose 轉換
 kompose convert
@@ -1068,7 +625,7 @@ kompose convert
 kubectl apply -f k8s/
 ```
 
-#### 3. 雲端部署
+#### 2. 雲端部署
 ```bash
 # AWS ECS
 ecs-cli compose up
@@ -1115,10 +672,10 @@ az container create
 
 ```bash
 # 停止並刪除所有服務
-docker-compose down
+docker compose down
 
 # 刪除所有資源（包括卷和網路）
-docker-compose down -v --remove-orphans
+docker compose down -v --remove-orphans
 
 # 清理未使用的映像
 docker image prune -a

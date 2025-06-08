@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # MySQL 資料庫服務
+  database:
+    image: mysql:8.0
+    container_name: flask-mysql-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      # 資料持久化
+      - mysql_data:/var/lib/mysql
+      # 初始化腳本
+      - ./database/init:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Flask Web 應用服務
+  web:
+    build: ./app
+    # container_name: flask-web-app # 指定容器名稱，使用 --scale 時會有衝突（--scale web=2 意思為啟動兩個 web 容器）
+    restart: unless-stopped
+    environment:
+      DB_HOST: database
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_PORT: 3306
+      FLASK_ENV: ${FLASK_ENV}
+      PORT: ${PORT}
+    ports:
+      - "8080:5000"
+    volumes:
+      # 開發時掛載代碼目錄（可選）
+      - ./app:/app
+    networks:
+      - app-network
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # phpMyAdmin 資料庫管理介面
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: flask-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: ${PMA_HOST}
+      PMA_PORT: ${PMA_PORT}
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8081:80"
+    networks:
+      - app-network
+    depends_on:
+      database:
+        condition: service_healthy
+
+# 定義網路
+networks:
+  app-network:
+    driver: bridge
+    name: flask-mysql-network
+
+# 定義持久化卷
+volumes:
+  mysql_data:
+    name: flask-mysql-data
