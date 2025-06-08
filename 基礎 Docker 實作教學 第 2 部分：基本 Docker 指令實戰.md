@@ -1,6 +1,6 @@
 # 基礎 Docker 實作教學(第二部分：基本 Docker 指令實戰 )
 
-課程時間：30 分鐘
+課程時間：40 分鐘
 
 - 映像檔管理指令
 - 容器運行與交互
@@ -71,10 +71,8 @@ docker ps
 # 查看所有容器（包括停止的）
 docker ps -a
 
-# 停止容器
-docker stop myweb
-# 刪除容器
-docker rm myweb
+# 停止容器並刪除
+docker stop myweb && docker rm myweb
 ```
 
 ### 2. 容器端口映射
@@ -85,8 +83,8 @@ docker run -d --name myweb -p 8080:80 nginx
 # 檢查端口映射
 docker port myweb
 
-docker stop myweb
-docker rm myweb
+# 停止容器並刪除
+docker stop myweb && docker rm myweb
 ```
 
 ### 3. 容器與主機檔案交換
@@ -200,6 +198,9 @@ docker run --name my-nginx -d nginx
 
 # 為映像檔添加標籤
 docker tag nginx:latest my-nginx:v1.0
+
+# 列出所有映像檔及其標籤
+docker images
 
 # 使用自定義名稱運行容器
 docker run --name web-server -d -p 80:80 nginx

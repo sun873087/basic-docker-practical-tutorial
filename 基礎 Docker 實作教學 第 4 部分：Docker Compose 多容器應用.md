@@ -279,6 +279,23 @@ flask-mysql-app/
 
 ### 🐳 步驟 4：撰寫 docker-compose.yml
 
+**建立 `.env` 檔案：**
+```env
+# 資料庫配置
+MYSQL_ROOT_PASSWORD=rootpassword123
+MYSQL_DATABASE=flask_app
+MYSQL_USER=appuser
+MYSQL_PASSWORD=apppass
+
+# 應用程式配置
+FLASK_ENV=development
+PORT=5000
+
+# phpMyAdmin 配置
+PMA_HOST=database
+PMA_PORT=3306
+```
+
 **建立 `docker-compose.yml`：**
 ```yaml
 version: '3.8'
@@ -388,6 +405,9 @@ docker compose up -d --build
 
 **查看服務狀態：**
 ```bash
+# 列出目前本機上所有 Docker Compose 專案
+docker compose ls
+
 # 查看所有服務狀態
 docker compose ps
 
@@ -436,8 +456,8 @@ curl -X POST http://localhost:8080/api/users \
 docker compose exec web bash
 
 # 在容器內測試資料庫連接
-ping database
-nslookup database
+ping database # 測試資料庫連接
+nslookup database # 檢查 DNS 解析
 
 # 離開容器
 exit
@@ -476,7 +496,7 @@ docker volume inspect flask-mysql-data
 
 #### 3. 資料備份
 ```bash
-# 備份資料庫
+# 備份資料庫 MYSQL_ROOT_PASSWORD=rootpassword123
 docker compose exec database mysqldump -u root -p${MYSQL_ROOT_PASSWORD} flask_app > backup.sql
 
 # 或者備份整個資料卷

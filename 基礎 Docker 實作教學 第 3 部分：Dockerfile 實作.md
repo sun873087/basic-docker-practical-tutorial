@@ -269,11 +269,8 @@ ps aux
 # 離開容器
 exit
 
-# 停止容器
-docker stop my-flask-app
-
-# 刪除容器
-docker rm my-flask-app
+# 停止&刪除容器
+docker stop my-flask-app && docker rm my-flask-app
 ```
 
 ### 🛠️ 故障排除和常見問題
