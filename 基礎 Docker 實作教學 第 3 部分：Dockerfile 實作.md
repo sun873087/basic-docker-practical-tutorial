@@ -143,7 +143,7 @@ CMD ["--port", "8000"]
 
 ## 實作練習：建立自定義 Web 應用
 
-在這個實作練習中，我們將建立一個簡單的 Python Flask Web 應用，並使用 Dockerfile 將它容器化。這個練習將幫助您實際體驗從零開始建立自定義 Docker 映像的完整流程。
+在這個實作練習中，我們將建立一個簡單的 Python Flask Web 應用，並使用 Dockerfile 將它容器化。這個練習將幫助您掌握 Dockerfile 的撰寫和應用，並學會如何建立和運行自定義 Docker 映像。
 
 ### 🎯 練習目標
 - 建立一個簡單的 Flask Web 應用
@@ -152,146 +152,23 @@ CMD ["--port", "8000"]
 - 測試應用程式功能
 - 學習故障排除技巧
 
-### 📁 步驟 1：建立應用程式檔案
+### 📁 步驟 1：建立應用程式檔案 & 撰寫 Dockerfile
 
-首先，讓我們建立一個簡單的 Flask Web 應用。
-
-**建立專案目錄：**
-```bash
-mkdir flask-app
-cd flask-app
+首先，讓我們建立一個簡單的 Flask Web 應用 和 `Dockerfile`，因教學時間關係，我們將使用 GitHub 上的範例專案。請參考[基礎 Docker 實作教學 第 1 部分：快速入門](基礎%20Docker%20實作教學%20第%201%20部分：快速入門.md)中的範例。檔案結構：
 ```
-
-**建立 `app.py` 檔案：**
-```python
-from flask import Flask, render_template, jsonify
-import os
-import datetime
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return render_template('index.html',
-                         hostname=os.uname().nodename,
-                         timestamp=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-
-@app.route('/health')
-def health():
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.datetime.now().isoformat(),
-        'version': '1.0.0'
-    })
-
-@app.route('/api/info')
-def info():
-    return jsonify({
-        'app_name': 'Flask Docker Demo',
-        'python_version': os.sys.version,
-        'container_id': os.uname().nodename[:12]
-    })
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+flask-app/
+├── app.py
+├── requirements.txt
+├── Dockerfile
+├── .dockerignore
+└── templates/
+    └── index.html
 ```
+**`.dockerignore` 文件：**
 
-**建立 `requirements.txt` 檔案：**
-```txt
-Flask==2.3.3
-Werkzeug==2.3.7
-```
+用於排除不必要的檔案，可至 [Docker 官方文件](https://docs.docker.com/engine/reference/builder/#dockerignore-file)查詢
 
-**建立模板目錄和 HTML 檔案：**
-```bash
-mkdir templates
-```
-
-**建立 `templates/index.html` 檔案：**
-```html
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flask Docker Demo</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 50px auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-            text-align: center;
-            color: #2c3e50;
-            margin-bottom: 30px;
-        }
-        .info-box {
-            background: #ecf0f1;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 10px 0;
-        }
-        .api-links {
-            margin-top: 30px;
-        }
-        .api-links a {
-            display: inline-block;
-            margin: 10px;
-            padding: 10px 20px;
-            background: #3498db;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-        }
-        .api-links a:hover {
-            background: #2980b9;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🐳 Flask Docker Demo</h1>
-            <p>歡迎使用容器化的 Flask 應用程式！</p>
-        </div>
-        
-        <div class="info-box">
-            <strong>容器主機名稱：</strong> {{ hostname }}
-        </div>
-        
-        <div class="info-box">
-            <strong>當前時間：</strong> {{ timestamp }}
-        </div>
-        
-        <div class="api-links">
-            <h3>API 端點測試：</h3>
-            <a href="/health" target="_blank">健康檢查</a>
-            <a href="/api/info" target="_blank">應用資訊</a>
-        </div>
-        
-        <div style="margin-top: 30px; text-align: center; color: #7f8c8d;">
-            <p>🎉 恭喜！您已成功建立並運行了自定義的 Docker 容器</p>
-        </div>
-    </div>
-</body>
-</html>
-```
-
-### 🐳 步驟 2：撰寫 Dockerfile
-
-現在建立 Dockerfile 來定義如何建立我們的映像：
-
-**建立 `Dockerfile`：**
+**`Dockerfile` 文檔說明：**
 ```dockerfile
 # 使用官方 Python 3.9 映像作為基礎
 FROM python:3.9-slim
@@ -303,6 +180,9 @@ WORKDIR /app
 # 先複製 requirements.txt 可以利用 Docker 快取機制
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# 安裝 procps 套件（提供 ps 指令）
+RUN apt-get update && apt-get install -y procps && rm -rf /var/lib/apt/lists/*
 
 # 複製應用程式代碼
 COPY . .
@@ -327,21 +207,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 CMD ["python", "app.py"]
 ```
 
-**建立 `.dockerignore` 檔案：**
-```dockerignore
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.Python
-env
-pip-log.txt
-.git
-.gitignore
-README.md
-.env
-.venv
-```
+
 
 ### 🔨 步驟 3：建立 Docker 映像
 

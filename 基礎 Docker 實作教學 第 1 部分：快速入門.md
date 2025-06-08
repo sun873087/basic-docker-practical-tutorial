@@ -7,7 +7,6 @@
   - 容器是什麼？為什麼需要容器？
   - 映像檔、容器、倉庫的基本關係
 - 第一個容器運行示範
-- 安裝 Git 工具 & [下載範例專案](https://github.com/yourusername/Basic-Docker-practical-tutorial)
 
 ---
 
@@ -27,6 +26,15 @@ Play with Docker 平台是一個線上 Docker 實驗室，讓你可以在瀏覽�
      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
      <img src="./images/play-with-docker-instance.png" alt="Play with Docker instance" width="500" height="300">
      </div>
+
+2. **安裝 Git 工具 & [下載範例專案](https://github.com/sun873087/basic-docker-practical-tutorial)**：
+   ```bash
+      # 安裝 Git 工具(Play with Docker 平台預設已安裝 Git)
+      sudo apt-get update
+      sudo apt-get install git -y
+      # 下載範例專案
+      git clone https://github.com/sun873087/basic-docker-practical-tutorial.git
+   ```     
 ---
 
 ## Docker 核心概念簡介
